@@ -75,10 +75,44 @@ async def Cancelar_Pedido(pedido_id: int, session = Depends(pegar_sessao),usuari
 
 @order_router.post("/pedidos/adicionar-item/{id_pedido}")
 async def Adicionar_Pedido(id_pedido: int, item_pedido_schema: ItemPedidoSchema, session = Depends(pegar_sessao), usuario: Usuario = Depends(verify_token)):
+
     pedido = session.query(Pedidos).filter(Pedidos.id == id_pedido).first()
+
     if not pedido:
        raise HTTPException(status_code=400, detail="Pedido não existente")
     elif not usuario.admin or usuario.id != pedido.usuario_id: 
         raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa modificação")
     else:
         item_pedido = ItemPedido(item_pedido_schema.sabor, item_pedido_schema.tamanho, id_pedido, item_pedido_schema.preco_unitario, item_pedido_schema.quantidade)
+    
+        session.add(item_pedido)
+        pedido.calcularPreco()
+        session.commit()
+
+        return {
+            "mensagem" : "Item criado com sucesso",
+            "item_id" : item_pedido.id,
+            "preco_pedido": pedido.preco
+        }
+    
+@order_router.post("/pedidos/remover-item/{id_item_pedido}")
+async def Remover_Item_Pedido(id_item_pedido: int, session = Depends(pegar_sessao), usuario: Usuario = Depends(verify_token)):
+
+    item_pedido = session.query(ItemPedido).filter(ItemPedido.id == id_item_pedido).first()
+
+    if not item_pedido:
+       raise HTTPException(status_code=400, detail="Item no pedido não existente")
+    
+    pedido = session.query(Pedidos).filter(Pedidos.id == item_pedido.pedido_id).first()
+    
+    if not usuario.admin or usuario.id != pedido.usuario_id: 
+        raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa modificação")
+    else:
+        session.delete(item_pedido)
+        pedido.calcularPreco()
+        session.commit()
+        return {
+            "mensagem" : "Item removido com sucesso",
+            "quantidade_itens_pedido" : len(pedido.item),
+            "pedido" : pedido
+        }

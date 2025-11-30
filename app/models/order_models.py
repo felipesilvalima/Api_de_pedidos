@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine, Column, String, Boolean, Integer, Float, ForeignKey, Enum
-from sqlalchemy.orm import declarative_base
+from sqlalchemy.orm import declarative_base, relationship
 
 # criando conexao com banco de dados
 db = create_engine("mysql+pymysql://root:@localhost:3306/banco_db")
@@ -18,7 +18,7 @@ class Usuario(base):
     senha = Column(String(90), nullable=False)
     ativo = Column(Boolean, default=True)
     admin = Column(Boolean, default=False)
-
+  
     def __init__(self, nome, email, senha, ativo=True, admin=False):
         self.nome = nome
         self.email = email
@@ -38,11 +38,16 @@ class Pedidos(base):
     status = Column(Enum(*STATUS_PEDIDOS, name="status_enum"), default="PEDENTE", nullable=False)
     preco = Column(Float, default=0)
     usuario_id = Column(Integer, ForeignKey("usuarios.id"), nullable=False)
+    item = relationship("ItemPedido", cascade="all, delete-orphan")
 
     def __init__(self, usuario_id, status="PEDENTE", preco=0):
         self.usuario_id = usuario_id
         self.status = status
         self.preco = preco
+
+    def calcularPreco(self):
+        self.preco = sum(item.preco_unitario * item.quantidade for item in self.item)
+
 
 # =====================
 # Tabela ItensPedido
@@ -70,4 +75,5 @@ class ItemPedido(base):
 
 
 
-#executar a criação dos metadados do seu banco de dados
+#criar uma migração: alembic revision --autogenerate -m "adiconando novo relacioanamento"
+#executar migração: alembic upgrade head
