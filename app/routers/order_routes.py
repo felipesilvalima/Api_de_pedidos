@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.models.order_models import Pedidos
 from app.helpers.dependicies import pegar_sessao, verify_token
 from sqlalchemy.orm import Session
-from app.schemas.Pedido import PedidoSchema
+from app.schemas.Pedido import PedidoSchema,ResponsePedidoSchema
 from app.schemas.ItemPedido import ItemPedidoSchema
 from app.models.order_models import Pedidos, Usuario, ItemPedido
-
+from typing import List
 
 
 order_router = APIRouter(prefix="/api", tags=['api'],dependencies=[Depends(verify_token)]) #criando objeto da minha rota passando o prefixo
@@ -53,24 +53,48 @@ async def Buscar_Pedido(pedido_id, session = Depends(pegar_sessao),usuario: Usua
             return {"pedido" : pedido}, 200
 
 
-@order_router.post("/pedidos/cancelar/{pedido_id}") #criando meu endpoint pedidos do tipo get. buscar um pedido
+@order_router.patch("/pedidos/cancelar/{pedido_id}") #criando meu endpoint pedidos do tipo get. buscar um pedido
 async def Cancelar_Pedido(pedido_id: int, session = Depends(pegar_sessao),usuario: Usuario = Depends(verify_token)):
 
     pedido = session.query(Pedidos).filter(Pedidos.id == pedido_id).first() #verificando se existe o pedido
 
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado") # aviso no caso de não achar o pedido
+    
+    if usuario.id != pedido.usuario_id:
+        raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa modificação")
+    else:
+        if pedido.status == "FINALIZADO":
+            raise HTTPException(status_code=401, detail="Pedido não pode ser mais cancelado. O Pedido já foi finalizado")
+        
+        pedido.status = "CANCELADO"
+        session.commit() # commit para banco
+        return {
+            "mensagem" : f"Pedido do Número: {pedido.id} foi Cancelado com sucesso!",
+            "pedido" : pedido
+        }, 200
+        
+
+@order_router.patch("/pedidos/finalizar/{pedido_id}") #criando meu endpoint pedidos do tipo get. buscar um pedido
+async def Finalizar_Pedido(pedido_id: int, session = Depends(pegar_sessao),usuario: Usuario = Depends(verify_token)):
+
+    pedido = session.query(Pedidos).filter(Pedidos.id == pedido_id).first() #verificando se existe o pedido
+
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado") # aviso no caso de não achar o pedido 
+
     if not usuario.admin or usuario.id != pedido.usuario_id:
         raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa modificação")
     else:
-
-        if not pedido:
-            raise HTTPException(status_code=404, detail="Pedido não encontrado") # aviso no caso de não achar o pedido  
-        else:
-            pedido.status = "CANCELADO"
-            session.commit() # commit para banco
-            return {
-                "mensagem" : f"Pedido do Número: {pedido.id} foi Cancelado com sucesso!",
-                "pedido" : pedido
-            }, 200
+        if pedido.status == "CANCELADO":
+            raise HTTPException(status_code=401, detail="Pedido não pode ser mais finalizado. O Pedido já foi cancelado")
+        
+        pedido.status = "FINALIZADO"
+        session.commit() # commit para banco
+        return {
+            "mensagem" : f"Pedido do Número: {pedido.id} foi Finalizado com sucesso!",
+            "pedido" : pedido
+        }, 200
 
 
 @order_router.post("/pedidos/adicionar-item/{id_pedido}")
@@ -80,7 +104,7 @@ async def Adicionar_Pedido(id_pedido: int, item_pedido_schema: ItemPedidoSchema,
 
     if not pedido:
        raise HTTPException(status_code=400, detail="Pedido não existente")
-    elif not usuario.admin or usuario.id != pedido.usuario_id: 
+    elif usuario.id != pedido.usuario_id: 
         raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa modificação")
     else:
         item_pedido = ItemPedido(item_pedido_schema.sabor, item_pedido_schema.tamanho, id_pedido, item_pedido_schema.preco_unitario, item_pedido_schema.quantidade)
@@ -93,9 +117,9 @@ async def Adicionar_Pedido(id_pedido: int, item_pedido_schema: ItemPedidoSchema,
             "mensagem" : "Item criado com sucesso",
             "item_id" : item_pedido.id,
             "preco_pedido": pedido.preco
-        }
+        },201
     
-@order_router.post("/pedidos/remover-item/{id_item_pedido}")
+@order_router.delete("/pedidos/remover-item/{id_item_pedido}")
 async def Remover_Item_Pedido(id_item_pedido: int, session = Depends(pegar_sessao), usuario: Usuario = Depends(verify_token)):
 
     item_pedido = session.query(ItemPedido).filter(ItemPedido.id == id_item_pedido).first()
@@ -105,7 +129,7 @@ async def Remover_Item_Pedido(id_item_pedido: int, session = Depends(pegar_sessa
     
     pedido = session.query(Pedidos).filter(Pedidos.id == item_pedido.pedido_id).first()
     
-    if not usuario.admin or usuario.id != pedido.usuario_id: 
+    if usuario.id != pedido.usuario_id: 
         raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa modificação")
     else:
         session.delete(item_pedido)
@@ -115,4 +139,25 @@ async def Remover_Item_Pedido(id_item_pedido: int, session = Depends(pegar_sessa
             "mensagem" : "Item removido com sucesso",
             "quantidade_itens_pedido" : len(pedido.item),
             "pedido" : pedido
-        }
+        },200
+
+@order_router.get("/pedidos/visualizar/{pedido_id:int}",response_model=ResponsePedidoSchema) #criando meu endpoint pedidos do tipo get. buscar um pedido
+async def Visualizar_Pedido(pedido_id, session = Depends(pegar_sessao),usuario: Usuario = Depends(verify_token)):
+
+    pedido = session.query(Pedidos).filter((Pedidos.id == pedido_id) & (Pedidos.usuario_id == usuario.id)).first() #verificando se existe o pedido
+
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido não encontrado") # aviso no caso de não achar o pedido
+    else:
+        return pedido
+  
+
+@order_router.get("/pedidos/visualizar/pedidos", response_model=List[ResponsePedidoSchema]) 
+async def Visualizar_Todos_Pedidos(session = Depends(pegar_sessao),usuario: Usuario = Depends(verify_token)):
+
+    pedidos = session.query(Pedidos).filter(Pedidos.usuario_id == usuario.id).all() #verificando se existe o pedido
+
+    if not pedidos:
+        raise HTTPException(status_code=404, detail="Lista de Pedido vázia") # aviso no caso de não achar o pedido
+    else:
+        return pedidos
