@@ -26,13 +26,16 @@ async def Listar_Pedidos(session = Depends(pegar_sessao), usuario: Usuario = Dep
 
  
 @order_router.post("/pedidos") #criando meu endpoint pedidos do tipo post. Criar novo pedido
-async def Criar_Pedido(pedido_schema: PedidoSchema ,session = Depends(pegar_sessao)):
+async def Criar_Pedido(pedido_schema: PedidoSchema ,session = Depends(pegar_sessao),usuario: Usuario = Depends(verify_token)):
 
     usuario = session.query(Usuario).filter(Usuario.id ==  pedido_schema.usuario_id).first() # verificando se exister o usuario
 
     if not usuario:
         raise HTTPException(status_code=400, detail="Não foi possivel criar pedido. Usuário não existe") # aviso no caso de não achar o usuario
     else:
+        if usuario.id != pedido_schema.usuario_id:
+            raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa opereção")
+        
         novoPedido = Pedidos(pedido_schema.usuario_id) # chamando meu modelo pedidos passando parametro
         session.add(novoPedido) # add do pedido
         session.commit() # commit para banco
