@@ -40,58 +40,64 @@ async def home():
 
 @auth_router.post("/criar_conta") #criando meu endpoint criar conta do tipo post. Criar um novo usuário
 async def criarConta(usuario_schema: UsuarioSchema, session: Session = Depends(pegar_sessao),usuario_logado: Usuario = Depends(verify_token)):
-
-    usuario = session.query(Usuario).filter(Usuario.email == usuario_schema.email).first()
-    
-    if usuario:
-        raise HTTPException(status_code=400, detail="já existe um usuário com esse email")
-    else:
-        if usuario_logado.admin != True and usuario_schema.admin == True:
-            raise HTTPException(status_code=400, detail="Esse usuário não pode criar conta administradora") 
-        else:  
-            senha_criptografada = bcrypt_context.hash(usuario_schema.senha)
-            novoUsuario = Usuario(usuario_schema.nome, usuario_schema.email, senha_criptografada, usuario_schema.ativo, usuario_schema.admin)
-            session.add(novoUsuario)
-            session.commit()
-            return {"mensagem" : f"Usuário cadastrado com sucesso {novoUsuario.email}"}, 201
-
+    try:
+        usuario = session.query(Usuario).filter(Usuario.email == usuario_schema.email).first()
+        
+        if usuario:
+            raise HTTPException(status_code=400, detail="já existe um usuário com esse email")
+        else:
+            if usuario_logado.admin != True and usuario_schema.admin == True:
+                raise HTTPException(status_code=400, detail="Esse usuário não pode criar conta administradora") 
+            else:  
+                senha_criptografada = bcrypt_context.hash(usuario_schema.senha)
+                novoUsuario = Usuario(usuario_schema.nome, usuario_schema.email, senha_criptografada, usuario_schema.ativo, usuario_schema.admin)
+                session.add(novoUsuario)
+                session.commit()
+                return {"mensagem" : f"Usuário cadastrado com sucesso {novoUsuario.email}"}, 201
+    except Exception as error:
+        raise HTTPException(status_code=500, detail="Error interno no servidor: " + error) 
 
 
 @auth_router.post("/login") #criando meu endpoint autenticação do tipo post. Fazer login
 async def Login(logi_schema: LoginSchema, session: Session = Depends(pegar_sessao)):
+    try:
+        usuario = autenticarUsuario(email=logi_schema.email, senha=logi_schema.senha, session=session) # retorno da autenticação do usuario
 
-    usuario = autenticarUsuario(email=logi_schema.email, senha=logi_schema.senha, session=session) # retorno da autenticação do usuario
+        if usuario:  # se autenticar
 
-    if usuario:  # se autenticar
+            access_token = generate_token(usuario.id) #gerar um token de acesso
+            refresh_token = generate_token(usuario.id,duracao_toke=timedelta(days=7))
 
-        access_token = generate_token(usuario.id) #gerar um token de acesso
-        refresh_token = generate_token(usuario.id,duracao_toke=timedelta(days=7))
-
-        return {
-            "access_token" : access_token,
-            "refresh_token" : refresh_token,
-            "type_token" : "Bearer"
-        }, 200
-    else: # se não autenticar
-        raise HTTPException(status_code=403, detail="Email ou Senha inválida") 
+            return {
+                "access_token" : access_token,
+                "refresh_token" : refresh_token,
+                "type_token" : "Bearer"
+            }, 200
+        else: # se não autenticar
+            raise HTTPException(status_code=403, detail="Email ou Senha inválida")
+        
+    except Exception as error:
+        raise HTTPException(status_code=500, detail="Error interno no servidor: " + error) 
     
 
 
 @auth_router.post("/login-form") #criando meu endpoint autenticação do tipo post. Fazer login
 async def Login(dados_formualario: OAuth2PasswordRequestForm = Depends(), session: Session = Depends(pegar_sessao)):
+    try:
+        usuario = autenticarUsuario(email=dados_formualario.username, senha=dados_formualario.password, session=session) # retorno da autenticação do usuario
 
-    usuario = autenticarUsuario(email=dados_formualario.username, senha=dados_formualario.password, session=session) # retorno da autenticação do usuario
+        if usuario:  # se autenticar
 
-    if usuario:  # se autenticar
+            access_token = generate_token(usuario.id) #gerar um token de acesso
 
-        access_token = generate_token(usuario.id) #gerar um token de acesso
-
-        return {
-            "access_token" : access_token,
-            "type_token" : "Bearer"
-        }
-    else: # se não autenticar
-        raise HTTPException(status_code=403, detail="Email ou Senha inválida") 
+            return {
+                "access_token" : access_token,
+                "type_token" : "Bearer"
+            }
+        else: # se não autenticar
+            raise HTTPException(status_code=403, detail="Email ou Senha inválida")
+    except Exception as error:
+        raise HTTPException(status_code=500, detail="Error interno no servidor: " + error)  
 
 
 
