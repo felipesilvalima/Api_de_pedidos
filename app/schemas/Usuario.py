@@ -27,6 +27,9 @@ class UsuarioSchema(BaseModel):
         if not re.match(regex,email):
             raise HTTPException(status_code=400,detail="Campo email inválido")
         
+        if not email.endswith("@gmail.com"):
+            raise HTTPException(status_code=400,detail="O e-mail deve ser Gmail.")
+        
         return email
     
     @field_validator("senha")

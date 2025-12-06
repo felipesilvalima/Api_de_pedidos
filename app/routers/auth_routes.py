@@ -32,12 +32,6 @@ def autenticarUsuario(email, senha, session): #função para autenticar usuarios
      else: # se usuario e senha for válidos 
         return usuario
 
-
-@auth_router.get("/home")
-async def home():
-    return {"aqui e home"}
-
-
 @auth_router.post("/criar_conta") #criando meu endpoint criar conta do tipo post. Criar um novo usuário
 async def criarConta(usuario_schema: UsuarioSchema, session: Session = Depends(pegar_sessao),usuario_logado: Usuario = Depends(verify_token)):
   
