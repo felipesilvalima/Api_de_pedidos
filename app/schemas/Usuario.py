@@ -13,6 +13,10 @@ class UsuarioSchema(BaseModel):
     def nome_validator(cls, nome):
         if len(nome) > 30:
             raise HTTPException(status_code=400,detail="Campo nome dever ter no máximo 30 caracteres")
+        
+        if not isinstance(nome, str):
+            raise HTTPException(status_code=400,detail="Campo nome dever ser um sequência de caracteres")
+        
         return nome
     
 
