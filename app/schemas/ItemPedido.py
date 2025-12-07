@@ -1,11 +1,16 @@
 from pydantic import BaseModel, field_validator
 from fastapi import HTTPException
 from app.models.order_models import ItemPedido
+
 class ItemPedidoSchema(BaseModel):
     quantidade: int
     sabor: str
     tamanho: str
     preco_unitario: float
+
+    def ItemPedido():
+        item =  ItemPedido("","", 0)
+        return item
 
     @field_validator("quantidade")
     def quantidade_validator(cls, quantidade):
@@ -16,7 +21,7 @@ class ItemPedidoSchema(BaseModel):
 
     @field_validator("sabor")
     def sabor_validator(cls, sabor):
-        sabores = ItemPedido("","", 0)
+        sabores = ItemPedido()
 
         if not sabor in sabores.SABORES:
             raise HTTPException(status_code=400,detail="Esse sabor não existe em nosso cardápio")
@@ -25,7 +30,7 @@ class ItemPedidoSchema(BaseModel):
 
     @field_validator("tamanho")
     def tamanho_validator(cls, tamanho):
-        tamanhos = ItemPedido("","", 0)
+        tamanhos = ItemPedido()
 
         if not tamanho in tamanhos.TAMANHOS:
             raise HTTPException(status_code=400,detail="Esse Tamanho não existe em nosso cardápio")
