@@ -116,6 +116,12 @@ async def Adicionar_Pedido(id_pedido: int, item_pedido_schema: ItemPedidoSchema,
     elif usuario.id != pedido.usuario_id: 
         raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa modificação")
     else:
+        if pedido.status == "FINALIZADO":
+            raise HTTPException(status_code=400, detail="Não pode adicionar mais item neste pedido. O pedido já foi finalizado")
+        
+        elif pedido.status == "CANCELADO":
+            raise HTTPException(status_code=400, detail="Não pode adicionar mais item neste pedido. O pedido já foi cancelado")
+        
         item_pedido = ItemPedido(item_pedido_schema.sabor, item_pedido_schema.tamanho, id_pedido, item_pedido_schema.preco_unitario, item_pedido_schema.quantidade)
         
         session.add(item_pedido)
