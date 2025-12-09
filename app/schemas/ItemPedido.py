@@ -8,9 +8,6 @@ class ItemPedidoSchema(BaseModel):
     tamanho: str
     preco_unitario: float
 
-    def ItemPedido():
-        item =  ItemPedido("","", 0)
-        return item
 
     @field_validator("quantidade")
     def quantidade_validator(cls, quantidade):
@@ -21,7 +18,7 @@ class ItemPedidoSchema(BaseModel):
 
     @field_validator("sabor")
     def sabor_validator(cls, sabor):
-        sabores = ItemPedido()
+        sabores = ItemPedido("","", 0)
 
         if not sabor in sabores.SABORES:
             raise HTTPException(status_code=400,detail="Esse sabor não existe em nosso cardápio")
@@ -30,7 +27,7 @@ class ItemPedidoSchema(BaseModel):
 
     @field_validator("tamanho")
     def tamanho_validator(cls, tamanho):
-        tamanhos = ItemPedido()
+        tamanhos = ItemPedido("","", 0)
 
         if not tamanho in tamanhos.TAMANHOS:
             raise HTTPException(status_code=400,detail="Esse Tamanho não existe em nosso cardápio")
