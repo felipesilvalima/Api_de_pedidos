@@ -5,20 +5,22 @@ from app.schemas.Pedido import PedidoSchema,ResponsePedidoSchema
 from app.schemas.ItemPedido import ItemPedidoSchema
 from app.models.order_models import Pedidos, Usuario, ItemPedido
 from typing import List
-
+from app.helpers.filters_atributtes import filterPedido
 
 order_router = APIRouter(prefix="/api", tags=['api'],dependencies=[Depends(verify_token)]) #criando objeto da minha rota passando o prefixo
 
 
 @order_router.get("/pedidos") #criando meu endpoint pedidos do tipo get. Lista todos os pedidos
-async def Listar_Pedidos(session = Depends(pegar_sessao), usuario: Usuario = Depends(verify_token)):
+async def Listar_Pedidos(atributos: str = "", session = Depends(pegar_sessao), usuario: Usuario = Depends(verify_token)):
     
     if not usuario.admin:
         raise HTTPException(status_code=401, detail="Você não tem autorização para acessar essa operação")
     else:
-
-        pedidos = session.query(Pedidos).all() # pegando todos os pedidos
-
+        if atributos:
+            pedidos = filterPedido(atributos=atributos,session=session)
+        else:
+             pedidos = session.query(Pedidos).all() # pegando todos os pedidos
+            
         if not pedidos:
             raise HTTPException(status_code=404,detail="Nenhum pedido encontrado") # aviso no caso de não exister pedidos
         else:
@@ -45,13 +47,15 @@ async def Criar_Pedido(pedido_schema: PedidoSchema ,session = Depends(pegar_sess
 
 
 @order_router.get("/pedidos/{pedido_id}") #criando meu endpoint pedidos do tipo get. buscar um pedido
-async def Buscar_Pedido(pedido_id, session = Depends(pegar_sessao),usuario: Usuario = Depends(verify_token)):
+async def Buscar_Pedido(pedido_id: int,atributos: str = "", session = Depends(pegar_sessao),usuario: Usuario = Depends(verify_token)):
     
     if not usuario.admin:
         raise HTTPException(status_code=401, detail="Você não tem autorização para acessar essa operação")
     else:
-
-        pedido = session.query(Pedidos).filter(Pedidos.id == pedido_id).first() #verificando se existe o pedido
+        if atributos:
+            pedido = filterPedido(atributos=atributos,session=session,pedido_id=pedido_id)
+        else:
+            pedido = session.query(Pedidos).filter(Pedidos.id == pedido_id).first() #verificando se existe o pedido pedidos = session.query(Pedidos).all() # pegando todos os pedidos
 
         if not pedido:
             raise HTTPException(status_code=404, detail="Pedido não encontrado") # aviso no caso de não achar o pedido
@@ -116,23 +120,20 @@ async def Adicionar_Pedido(id_pedido: int, item_pedido_schema: ItemPedidoSchema,
     elif usuario.id != pedido.usuario_id: 
         raise HTTPException(status_code=401, detail="Você não tem autorização para fazer essa modificação")
     else:
-        if pedido.status == "FINALIZADO":
-            raise HTTPException(status_code=400, detail="Não pode adicionar mais item neste pedido. O pedido já foi finalizado")
+        if pedido.status == "PEDENTE": 
+            item_pedido = ItemPedido(item_pedido_schema.sabor, item_pedido_schema.tamanho, id_pedido, item_pedido_schema.preco_unitario, item_pedido_schema.quantidade)
         
-        elif pedido.status == "CANCELADO":
-            raise HTTPException(status_code=400, detail="Não pode adicionar mais item neste pedido. O pedido já foi cancelado")
-        
-        item_pedido = ItemPedido(item_pedido_schema.sabor, item_pedido_schema.tamanho, id_pedido, item_pedido_schema.preco_unitario, item_pedido_schema.quantidade)
-        
-        session.add(item_pedido)
-        pedido.calcularPreco()
-        session.commit()
+            session.add(item_pedido)
+            pedido.calcularPreco()
+            session.commit()
 
-        return {
-            "mensagem" : "Item criado com sucesso",
-            "item_id" : item_pedido.id,
-            "preco_pedido": pedido.preco
-        },201
+            return {
+                "mensagem" : "Item criado com sucesso",
+                "item_id" : item_pedido.id,
+                "preco_pedido": pedido.preco
+            },201
+        else:
+             raise HTTPException(status_code=400, detail="Não pode adicionar mais item neste pedido. O pedido foi finalizado/cancelado")
  
     
 @order_router.delete("/pedidos/remover-item/{id_item_pedido}")
